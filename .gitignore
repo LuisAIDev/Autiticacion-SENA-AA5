@@ -1,0 +1,11 @@
+# Dependencias de Node (son muy pesadas para subir)
+node_modules/
+módulos_de_nodo/
+
+# Archivos de configuración sensible (claves de seguridad)
+.env
+node_module.env
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
