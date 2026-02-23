@@ -1,57 +1,84 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const userService = require('../services/userService');
 
-// A. Registro de Usuario
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
   try {
-    const { nombre, username, passwordHash } = req.body;
+    const { nombre, username, password } = req.body;
 
-    // Verificar si el usuario ya existe
-    let user = await User.findOne({ username });
-    if (user)
-      return res
-        .status(400)
-        .json({ ok: false, message: 'El usuario ya existe' });
+    if (!nombre || !username || !password) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Campos obligatorios',
+      });
+    }
 
-    // Crear nuevo usuario (el hash se hace en el modelo)
-    user = new User({ nombre, username, passwordHash });
-    await user.save();
+    const userExists = await userService.findUserByUsername(username);
+    if (userExists) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Usuario ya existe',
+      });
+    }
 
-    res.status(201).json({ ok: true, message: 'Usuario registrado con éxito' });
+    // ✅ DESPUÉS (con hash real)
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    await userService.createUser({
+      nombre,
+      username,
+      passwordHash,
+    });
+
+    res.status(201).json({
+      ok: true,
+      message: 'Usuario registrado',
+    });
   } catch (error) {
-    res.status(500).json({ ok: false, message: 'Error en el servidor' });
+    next(error);
   }
 };
 
-// B. Login
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // Validar credenciales
-    const user = await User.findOne({ username });
-    if (!user)
-      return res
-        .status(401)
-        .json({ ok: false, message: 'Credenciales inválidas' });
+    if (!username || !password) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Campos obligatorios',
+      });
+    }
 
-    // Comparar contraseña hasheada
+    const user = await userService.findUserByUsername(username);
+    if (!user) {
+      return res.status(401).json({
+        ok: false,
+        message: 'Credenciales inválidas',
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch)
-      return res
-        .status(401)
-        .json({ ok: false, message: 'Credenciales inválidas' });
+    if (!isMatch) {
+      return res.status(401).json({
+        ok: false,
+        message: 'Credenciales inválidas',
+      });
+    }
 
-    // Generar token firmado con clave secreta [cite: 6, 7]
     const token = jwt.sign(
-      { id: user._id, rol: user.rol },
+      { id: user._id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' },
+      { expiresIn: '1h' },
     );
 
-    res.json({ ok: true, token });
+    res.json({
+      ok: true,
+      message: 'Login exitoso',
+      token,
+    });
   } catch (error) {
-    res.status(500).json({ ok: false, message: 'Error en el servidor' });
+    next(error);
   }
 };

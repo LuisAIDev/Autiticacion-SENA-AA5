@@ -1,24 +1,40 @@
 const express = require('express');
-const dotenv = require('dotenv');
-const conectarDB = require('./config/db');
-
-// Configuración de variables de entorno [cite: 8]
-dotenv.config();
-
 const app = express();
 
-// Middleware para que el servidor entienda JSON
+// middlewares
 app.use(express.json());
 
-// Conexión a la base de datos
-conectarDB();
+// rutas
+const authRoutes = require('./routes/auth.routes');
+const profileRoutes = require('./routes/profileRoutes');
 
-// Rutas (Las definiremos a continuación)
-app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/auth', authRoutes);
+app.use('/api', profileRoutes);
 
-// Manejo de errores 404 - Ruta no encontrada [cite: 10]
+// ruta base
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'API funcionando 🚀',
+    estudiante: 'Luis Guerra',
+  });
+});
+
+// 404
 app.use((req, res) => {
-  res.status(404).json({ ok: false, message: 'Ruta no encontrada' });
+  res.status(404).json({
+    ok: false,
+    message: 'Ruta no encontrada',
+  });
+});
+
+// error global
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({
+    ok: false,
+    message: 'Error interno',
+  });
 });
 
 module.exports = app;
